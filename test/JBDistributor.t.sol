@@ -184,7 +184,10 @@ contract JBDistributorTest is Test {
 
 contract ForTest_JBDistributor is JBDistributor {
     function overrideClaimableBasket(JBDistributor.ClaimableToken[] memory _newBasket) public {
-        currentClaimableBasket = _newBasket;
+        delete currentClaimableBasket;
+
+        for(uint256 i = 0; i < currentClaimableBasket.length; i++)
+            currentClaimableBasket.push(_newBasket[i]);
     }
 
     function overrideSnapshotTimestamp(uint256 _newTimestamp) public {

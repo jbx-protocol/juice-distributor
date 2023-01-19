@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import "../src/JBDistributor.sol";
 
 contract JBDistributorTest is Test {
+    event Claimed(address indexed caller, JBDistributor.ClaimableToken[] basket);
     event SnapshotTaken(uint256 timestamp);
 
     ForTest_JBDistributor public distributor;
@@ -115,7 +116,7 @@ contract JBDistributorTest is Test {
     /**
      *  custom:test After a snapshot has been taken, staker might claim their share of the basket
      */
-    function test_JBDistributor_claim_shouldClaimPartOfTheBasket() public {
+    function test_JBDistributor_claim_shouldClaimPartOfTheBasketOnlyOnce() public {
         // Delay has expired
         distributor.overrideSnapshotTimestamp(block.timestamp - distributor.periodicity());
 
@@ -130,12 +131,20 @@ contract JBDistributorTest is Test {
         vm.expectCall(tokenThree, abi.encodeWithSelector(IERC20.transfer.selector, staker, 300));
 
         // Check: correct event?
+        emit Claimed(staker, previousBasket);
+        vm.expectEmit(true, true, true, true);
 
         // -- claim --
+        vm.prank(staker);
+        distributor.claim();
 
         // Check: staker has nothing to claim left
+        assertEq(new JBDistributor.ClaimableToken[](0), distributor.currentClaimable(staker));
 
         // Check: cannot claim a second time
+        vm.expectRevert(abi.encodeWithSelector(JBDistributor.JBDistributor_emptyClaim.selector));
+        vm.prank(staker);
+        distributor.claim();
     }
 
     /**

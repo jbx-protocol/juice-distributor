@@ -7,6 +7,7 @@ pragma solidity ^0.8.17;
  * @dev 
  */
 contract JBDistributor {
+    event Claimed(address indexed caller, ClaimableToken[] basket);
     event SnapshotTaken(uint256 timestamp);
 
     struct ClaimableToken {
@@ -14,6 +15,7 @@ contract JBDistributor {
         uint256 claimableAmount;
     }
 
+    error JBDistributor_emptyClaim();
     error JBDistributor_snapshotTooEarly();
 
     // The timestamp of the last snapshot
@@ -50,6 +52,10 @@ contract JBDistributor {
 
     // take a snapshot of the claimable basket total amounts
     function takeSnapshot() external {
+    }
+
+    function claim() external {
+
     }
 
 }

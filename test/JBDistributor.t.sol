@@ -6,6 +6,8 @@ import "forge-std/Test.sol";
 import "../src/JBDistributor.sol";
 
 contract JBDistributorTest is Test {
+    event SnapshotTaken(uint256 timestamp);
+
     JBDistributor public distributor;
 
     address public staker;
@@ -35,50 +37,125 @@ contract JBDistributorTest is Test {
      *  custom:test deposit should deposit, update balance and do not influence previously claimable amounts
      */
     function test_JBDistributor_deposit_shouldDepositAndUpdateBalance(uint256 _depositAmount) public {
+        // shadowing to override claimable basket
+        ForTest_JBDistributor _forTestDistributor = new ForTest_JBDistributor();
+
+        // Mock a previous snapshot
+        JBDistributor.ClaimableToken[] memory _newBasket = new JBDistributor.ClaimableToken[](3);
+        _newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 100);
+        _newBasket[1] = JBDistributor.ClaimableToken(tokenTwo, 200);
+        _newBasket[2] = JBDistributor.ClaimableToken(tokenThree, 300);
+
+        _forTestDistributor.overrideClaimableBasket(_newBasket);
+
         // Get the previously claimable basket amounts
-        JBDistributor.ClaimableToken[] memory _claimableBefore = distributor.currentClaimable(staker);
+        JBDistributor.ClaimableToken[] memory _claimableBefore = _forTestDistributor.currentClaimable(staker);
 
         // get the amount already staked
-        uint256 stakedBalanceBefore = distributor.stakedBalanceOf(staker);
+        uint256 stakedBalanceBefore = _forTestDistributor.stakedBalanceOf(staker);
 
         // -- deposit --
         vm.prank(staker);
-        distributor.deposit(_depositAmount);
-
+        _forTestDistributor.deposit(_depositAmount);
 
         // Check: claimable amounts should not have changed
-        assertEq(_claimableBefore, distributor.currentClaimable(staker));
+        assertEq(_claimableBefore, _forTestDistributor.currentClaimable(staker));
 
         // Check: staked balance should have increased by the deposit
-        assertEq(stakedBalanceBefore + _depositAmount, distributor.stakedBalanceOf(staker));
+        assertEq(stakedBalanceBefore + _depositAmount, _forTestDistributor.stakedBalanceOf(staker));
     }
 
     /**
      *  custom:test takes a snapshot and create the periodic basket of tokens
      */
-    function test_JBDistributor_takeSnapshot_takesSnapshotIfDelayExpired(uint256 _delay) public {
+    function test_JBDistributor_takeSnapshot_takesSnapshotIfDelayExpired(uint256 _currentTimestamp) public {
+        // shadowing to override claimable basket
+        ForTest_JBDistributor _forTestDistributor = new ForTest_JBDistributor();
+
+        vm.assume(_currentTimestamp > block.timestamp + _forTestDistributor.periodicity());
+
+        // Mock a previous snapshot
+        JBDistributor.ClaimableToken[] memory _newBasket = new JBDistributor.ClaimableToken[](3);
+        _newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 100);
+        _newBasket[1] = JBDistributor.ClaimableToken(tokenTwo, 200);
+        _newBasket[2] = JBDistributor.ClaimableToken(tokenThree, 300);
+        _forTestDistributor.overrideClaimableBasket(_newBasket);
+        _forTestDistributor.overrideSnapshotTimestamp(1);
+
+        vm.warp(_currentTimestamp);
+
+        // Check: correct event?
+        emit SnapshotTaken(_currentTimestamp);
+        vm.expectEmit(true, true, true, true);
+
+        // -- take snapshot --
+        _forTestDistributor.takeSnapshot();
+
+        // Check: snapshot timestamp should have been updated
+
+        // Check: claimable basket should have been updated
 
     }
 
     /**
      *  custom:test snapshot() reverts if called too early, after the previous snapshot has been taken
      */
-    function test_JBDistributor_takeSnapshot_doNotSnapshotBeforeDelay(uint256 _delay) public {
+    function test_JBDistributor_takeSnapshot_doNotSnapshotBeforeDelay(uint256 _currentTimestamp) public {
+                // shadowing to override claimable basket
+        ForTest_JBDistributor _forTestDistributor = new ForTest_JBDistributor();
 
+        vm.assume(_currentTimestamp <= block.timestamp + _forTestDistributor.periodicity());
+
+        // Mock a previous snapshot
+        JBDistributor.ClaimableToken[] memory _newBasket = new JBDistributor.ClaimableToken[](3);
+        _newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 100);
+        _newBasket[1] = JBDistributor.ClaimableToken(tokenTwo, 200);
+        _newBasket[2] = JBDistributor.ClaimableToken(tokenThree, 300);
+        _forTestDistributor.overrideClaimableBasket(_newBasket);
+        _forTestDistributor.overrideSnapshotTimestamp(1);
+
+        // Check: revert if delay hasn't expired?
+        vm.warp(_currentTimestamp);
+        vm.expectRevert(abi.encodeWithSelector(JBDistributor.JBDistributor_snapshotTooEarly.selector));
+
+        // -- take snapshot --
+        _forTestDistributor.takeSnapshot();
     }
 
     /**
      *  custom:test After a snapshot has been taken, staker might claim their share of the basket
      */
     function test_JBDistributor_claim_shouldClaimPartOfTheBasket() public {
+        // shadowing to override claimable basket
+        ForTest_JBDistributor _forTestDistributor = new ForTest_JBDistributor();
 
-    }
+        // Mock a previous snapshot
+        JBDistributor.ClaimableToken[] memory _newBasket = new JBDistributor.ClaimableToken[](3);
+        _newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 100);
+        _newBasket[1] = JBDistributor.ClaimableToken(tokenTwo, 200);
+        _newBasket[2] = JBDistributor.ClaimableToken(tokenThree, 300);
+        _forTestDistributor.overrideClaimableBasket(_newBasket);
 
-    /**
-     *  custom:test After a claim, staker need to wait for the next snapshot to claim again
-     */
-    function test_JBDistributor_claim_onlyClaimOnce() public {
+        // Delay has expired
+        _forTestDistributor.overrideSnapshotTimestamp(block.timestamp - _forTestDistributor.periodicity());
 
+        // Mock the token transfers
+        vm.mockCall(tokenOne, abi.encodeWithSelector(IERC20.transfer.selector, staker, 100), abi.encode(true));
+        vm.mockCall(tokenTwo, abi.encodeWithSelector(IERC20.transfer.selector, staker, 200), abi.encode(true));
+        vm.mockCall(tokenThree, abi.encodeWithSelector(IERC20.transfer.selector, staker, 300), abi.encode(true));
+
+        // Check: correct call to token transfers?
+        vm.expectCall(tokenOne, abi.encodeWithSelector(IERC20.transfer.selector, staker, 100));
+        vm.expectCall(tokenTwo, abi.encodeWithSelector(IERC20.transfer.selector, staker, 200));
+        vm.expectCall(tokenThree, abi.encodeWithSelector(IERC20.transfer.selector, staker, 300));
+
+        // Check: correct event?
+
+        // -- claim --
+
+        // Check: staker has nothing to claim left
+
+        // Check: cannot claim a second time
     }
 
     /**
@@ -102,5 +179,15 @@ contract JBDistributorTest is Test {
             assertEq(_a[i].token, _b[i].token);
             assertEq(_a[i].claimableAmount, _b[i].claimableAmount);
         }
+    }
+}
+
+contract ForTest_JBDistributor is JBDistributor {
+    function overrideClaimableBasket(JBDistributor.ClaimableToken[] memory _newBasket) public {
+        currentClaimableBasket = _newBasket;
+    }
+
+    function overrideSnapshotTimestamp(uint256 _newTimestamp) public {
+        lastSnapshotAt = _newTimestamp;
     }
 }

@@ -34,6 +34,14 @@ contract JBDistributor {
     function currentClaimable(address _staker) external view returns (ClaimableToken[] memory) {
     }
 
+    function getBasket() external view returns (address[] memory token, uint256[] memory claimableAmount) {
+        uint256 _numberOfTokens = currentClaimableBasket.length;
+        for(uint256 i; i < _numberOfTokens; i++) {
+            token[i] = currentClaimableBasket[i].token;
+            claimableAmount[i] = currentClaimableBasket[i].claimableAmount;
+        }
+    }
+
     // -- external --
 
     // deposit _depositAmount of stakedToken

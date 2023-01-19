@@ -17,6 +17,8 @@ contract JBDistributorTest is Test {
     address public tokenTwo;
     address public tokenThree;
 
+    JBDistributor.ClaimableToken[] previousBasket;
+
     function setUp() public {
         staker = makeAddr("staker");
 
@@ -24,11 +26,10 @@ contract JBDistributorTest is Test {
         distributor = new ForTest_JBDistributor();
 
         // Mock a previous snapshot
-        JBDistributor.ClaimableToken[] memory _newBasket = new JBDistributor.ClaimableToken[](3);
-        _newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 100);
-        _newBasket[1] = JBDistributor.ClaimableToken(tokenTwo, 200);
-        _newBasket[2] = JBDistributor.ClaimableToken(tokenThree, 300);
-        distributor.overrideClaimableBasket(_newBasket);
+        previousBasket.push(JBDistributor.ClaimableToken(tokenOne, 100));
+        previousBasket.push(JBDistributor.ClaimableToken(tokenTwo, 200));
+        previousBasket.push(JBDistributor.ClaimableToken(tokenThree, 300));
+        distributor.overrideClaimableBasket(previousBasket);
         distributor.overrideSnapshotTimestamp(block.timestamp);
 
         // Initialize mocks
@@ -71,6 +72,11 @@ contract JBDistributorTest is Test {
 
         vm.warp(_currentTimestamp);
 
+        // Mock the ERC20 balances
+        vm.mockCall(tokenOne, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(1000));
+        vm.mockCall(tokenTwo, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(2000));
+        vm.mockCall(tokenThree, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(3000));
+
         // Check: correct event?
         emit SnapshotTaken(_currentTimestamp);
         vm.expectEmit(true, true, true, true);
@@ -79,9 +85,19 @@ contract JBDistributorTest is Test {
         distributor.takeSnapshot();
 
         // Check: snapshot timestamp should have been updated
+        assertEq(_currentTimestamp, distributor.lastSnapshotAt());
 
         // Check: claimable basket should have been updated
+        JBDistributor.ClaimableToken[] memory newBasket = new JBDistributor.ClaimableToken[](3);
+        newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 1000);
+        newBasket[1] = JBDistributor.ClaimableToken(tokenTwo, 2000);
+        newBasket[2] = JBDistributor.ClaimableToken(tokenThree, 3000);
 
+        for(uint256 i; i < newBasket.length; i++) {
+            (address _token, uint256 _amount) = distributor.currentClaimableBasket(i);
+            assertEq(newBasket[i].token, _token);
+            assertEq(newBasket[i].claimableAmount, _amount);
+        }
     }
 
     /**

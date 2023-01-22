@@ -40,9 +40,12 @@ contract JBDistributor is IJBSplitAllocator, IERC165 {
 
     function getBasket() external view returns (address[] memory token, uint256[] memory claimableAmount) {
         uint256 _numberOfTokens = currentClaimableBasket.length;
-        for(uint256 i; i < _numberOfTokens; i++) {
+        for(uint256 i; i < _numberOfTokens;) {
             token[i] = currentClaimableBasket[i].token;
             claimableAmount[i] = currentClaimableBasket[i].claimableAmount;
+            unchecked {
+                ++ i;
+            }
         }
     }
 

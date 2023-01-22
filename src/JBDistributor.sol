@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import { IJBSplitAllocator, IERC165 } from "@juicebox/interfaces/IJBSplitAllocator.sol";
+
 /**
  * @title   JBDistributor
  * @notice 
  * @dev 
  */
-contract JBDistributor {
+contract JBDistributor is IJBSplitAllocator, IERC165 {
     event Claimed(address indexed caller, ClaimableToken[] basket);
     event SnapshotTaken(uint256 timestamp);
 
@@ -44,18 +46,31 @@ contract JBDistributor {
         }
     }
 
+    function supportsInterface(bytes4 interfaceId) external view returns (bool) {
+        return interfaceId == type(IJBSplitAllocator).interfaceId
+            || interfaceId == type(IERC165).interfaceId;
+    }
+
     // -- external --
 
     // deposit _depositAmount of stakedToken
-    function deposit(uint256 _depositAmount) external {
+    function stake(uint256 _depositAmount) external {
     }
 
-    // take a snapshot of the claimable basket total amounts
-    function takeSnapshot() external {
+    function unstake() external {
     }
 
     function claim() external {
-
     }
+
+    function allocate(JBSplitAllocationData calldata _data) external override {
+    }
+
+    // -- internal --
+
+    // take a snapshot of the claimable basket total amounts
+    function takeSnapshot() internal {
+    }
+
 
 }

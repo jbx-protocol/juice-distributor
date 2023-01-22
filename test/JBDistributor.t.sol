@@ -26,13 +26,6 @@ contract JBDistributorTest is Test {
         // Initialize a distributor and a first snapshot
         distributor = new ForTest_JBDistributor();
 
-        // Mock a previous snapshot
-        previousBasket.push(JBDistributor.ClaimableToken(tokenOne, 100));
-        previousBasket.push(JBDistributor.ClaimableToken(tokenTwo, 200));
-        previousBasket.push(JBDistributor.ClaimableToken(tokenThree, 300));
-        distributor.overrideClaimableBasket(previousBasket);
-        distributor.overrideSnapshotTimestamp(block.timestamp);
-
         // Initialize mocks
         stakedToken = makeAddr("stakedToken");
         tokenOne = makeAddr("tokenOne");
@@ -42,6 +35,12 @@ contract JBDistributorTest is Test {
         vm.etch(tokenOne, hex"69");
         vm.etch(tokenTwo, hex"69");
         vm.etch(tokenThree, hex"69");
+
+        // Mock a previous snapshot
+        previousBasket.push(JBDistributor.ClaimableToken(tokenOne, 100));
+        previousBasket.push(JBDistributor.ClaimableToken(tokenTwo, 200));
+        distributor.overrideClaimableBasket(previousBasket);
+        distributor.overrideSnapshotTimestamp(block.timestamp);
     }
 
     /**
@@ -66,12 +65,27 @@ contract JBDistributorTest is Test {
     }
 
     /**
-     *  custom:test takes a snapshot and create the periodic basket of tokens
+     *  custom:test when allocating a new token (tokenThree), if the delay has passed, a new snapshot is taken with
+     *              a basket made of the new token and any leftover of the previous basket.
      */
-    function test_JBDistributor_takeSnapshot_takesSnapshotIfDelayExpired(uint256 _currentTimestamp) public {
+    function test_JBDistributor_allocate_takesSnapshotIfDelayExpired(uint256 _currentTimestamp) public {
+        // Set the current timestamp after the claiming period
         vm.assume(_currentTimestamp > block.timestamp + distributor.periodicity());
-
         vm.warp(_currentTimestamp);
+
+        // Mock an allocation data
+        JBSplitAllocationData memory _data = JBSplitAllocationData({
+            token: tokenThree,
+            amount: 3000,
+            decimals: 18,
+            projectId: 0,
+            group: 1,
+            split: JBSplit({
+                allocator: address(distributor),
+                percent: 0,
+                recipient: address(0)
+            })
+        });
 
         // Mock the ERC20 balances
         vm.mockCall(tokenOne, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(1000));
@@ -83,7 +97,7 @@ contract JBDistributorTest is Test {
         vm.expectEmit(true, true, true, true);
 
         // -- take snapshot --
-        distributor.takeSnapshot();
+        distributor.allocate(_data);
 
         // Check: snapshot timestamp should have been updated
         assertEq(_currentTimestamp, distributor.lastSnapshotAt());
@@ -102,15 +116,60 @@ contract JBDistributorTest is Test {
     }
 
     /**
-     *  custom:test snapshot() reverts if called too early, after the previous snapshot has been taken
+     *  custom:test allocate does not take a new snapshot but add the incoming token to the pending basket
      */
-    function test_JBDistributor_takeSnapshot_doNotSnapshotBeforeDelay(uint256 _currentTimestamp) public {
-        // Check: revert if delay hasn't expired?
-        vm.warp(_currentTimestamp);
-        vm.expectRevert(abi.encodeWithSelector(JBDistributor.JBDistributor_snapshotTooEarly.selector));
+    function test_JBDistributor_allocate_doNotSnapshotBeforeDelay(uint256 _currentTimestamp) public {
+
+    }
+
+    /**
+     *  custom:test When a snapshot is taken, tokens with a zero balance are removed from the basket
+     */
+    function test_JBDistributor_allocate_shouldRemoveTokenWithEmptyBalanceDuringSnapshot() public {
+
+        // Delay has expired
+        distributor.overrideSnapshotTimestamp(block.timestamp);
+        vm.warp(block.timestamp + distributor.periodicity() + 1);
+
+        // Mock an allocation data
+        JBSplitAllocationData memory _data = JBSplitAllocationData({
+            token: tokenThree,
+            amount: 3000,
+            decimals: 18,
+            projectId: 0,
+            group: 1,
+            split: JBSplit({
+                allocator: address(distributor),
+                percent: 0,
+                recipient: address(0)
+            })
+        });
+
+        // Mock the ERC20 balances
+        vm.mockCall(tokenOne, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(1000));
+        vm.mockCall(tokenTwo, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(0));
+        vm.mockCall(tokenThree, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(3000));
+
+        // Check: correct event?
+        emit SnapshotTaken(_currentTimestamp);
+        vm.expectEmit(true, true, true, true);
 
         // -- take snapshot --
-        distributor.takeSnapshot();
+        distributor.allocate(_data);
+
+        // Check: snapshot timestamp should have been updated
+        assertEq(_currentTimestamp, distributor.lastSnapshotAt());
+
+        // Check: claimable basket should have been updated
+        JBDistributor.ClaimableToken[] memory newBasket = new JBDistributor.ClaimableToken[](2);
+        newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 1000);
+        newBasket[1] = JBDistributor.ClaimableToken(tokenThree, 3000);
+
+        for(uint256 i; i < newBasket.length; i++) {
+            (address _token, uint256 _amount) = distributor.currentClaimableBasket(i);
+            assertEq(newBasket[i].token, _token);
+            assertEq(newBasket[i].claimableAmount, _amount);
+        }
     }
 
     /**
@@ -145,20 +204,6 @@ contract JBDistributorTest is Test {
         vm.expectRevert(abi.encodeWithSelector(JBDistributor.JBDistributor_emptyClaim.selector));
         vm.prank(staker);
         distributor.claim();
-    }
-
-    /**
-     *  custom:test Add new token to the claimable offer
-     */
-    function test_JBDistributor_updateBasket_shouldAddNewTokenToTheBasket() public {
-
-    }
-
-    /**
-     *  custom:test Remove token from the claimable offer
-     */
-    function test_JBDistributor_updateBasket_shouldremoveTokenFromTheBasket() public {
-
     }
 
     // internal helper

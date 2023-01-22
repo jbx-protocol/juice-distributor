@@ -2,13 +2,14 @@
 pragma solidity ^0.8.17;
 
 import { IJBSplitAllocator, IERC165 } from "@juicebox/interfaces/IJBSplitAllocator.sol";
+import { JBSplitAllocationData } from "@juicebox/structs/JBSplitAllocationData.sol";
 
 /**
  * @title   JBDistributor
  * @notice 
  * @dev 
  */
-contract JBDistributor is IJBSplitAllocator, IERC165 {
+contract JBDistributor is IJBSplitAllocator {
     event Claimed(address indexed caller, ClaimableToken[] basket);
     event SnapshotTaken(uint256 timestamp);
 
@@ -49,7 +50,7 @@ contract JBDistributor is IJBSplitAllocator, IERC165 {
         }
     }
 
-    function supportsInterface(bytes4 interfaceId) external view returns (bool) {
+    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
         return interfaceId == type(IJBSplitAllocator).interfaceId
             || interfaceId == type(IERC165).interfaceId;
     }
@@ -64,9 +65,11 @@ contract JBDistributor is IJBSplitAllocator, IERC165 {
     }
 
     function claim() external {
+        // protection for fee on transfer token (everything in try-catch and skip them?)
+        // if none -> griefing vector
     }
 
-    function allocate(JBSplitAllocationData calldata _data) external override {
+    function allocate(JBSplitAllocationData calldata _data) external payable override {
     }
 
     // -- internal --

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.17;
 
 import { IJBSplitAllocator, IERC165 } from "@juicebox/interfaces/IJBSplitAllocator.sol";
-import { ETH } from "@juicebox/libraries/JBTokens.sol";
 import { JBSplitAllocationData } from "@juicebox/structs/JBSplitAllocationData.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -18,14 +17,14 @@ contract JBDistributor is IJBSplitAllocator {
     error JBDistributor_emptyClaim();
     error JBDistributor_snapshotTooEarly();
 
-    // The timestamp of the last snapshot
-    uint256 public lastSnapshotAt;
-
     // The minimum delay between two snapshots
-    uint256 public periodicity;
+    uint256 immutable public periodicity;
 
     // The staked token
-    IERC20 public stakedToken;
+    IERC20 immutable public stakedToken;
+
+    // The timestamp of the last snapshot
+    uint256 public lastSnapshotAt;
 
     // staked token per address
     mapping(address => uint256) public stakedBalanceOf;
@@ -73,6 +72,11 @@ contract JBDistributor is IJBSplitAllocator {
 
     // -- external --
 
+    constructor(IERC20 _stakedToken, uint256 _periodicity) {
+        stakedToken = _stakedToken;
+        periodicity = _periodicity;
+    }
+
     // deposit _depositAmount of stakedToken
     function stake(uint256 _amount) external {
     }
@@ -85,7 +89,7 @@ contract JBDistributor is IJBSplitAllocator {
         // if none -> griefing vector
     }
 
-    // For now, only ERC20 -> to support unclaimed project token, claim() should have a way to know if claimed/unclaimed
+    // For now, only ERC20 -> to support project token without erc20, claim() should have a way to know if claimed/unclaimed
     // (additional mapping? Additional call to tokenStore.balanceOf? -> need gas check)
     function allocate(JBSplitAllocationData calldata _data) external payable override {
         // Check if the token is already tracked, if not, add it
@@ -137,7 +141,7 @@ contract JBDistributor is IJBSplitAllocator {
     }
 
     // returns true if a token is in a token array
-    function _isIn(IERC20 _token, IERC20[] storage _tokens) internal pure returns (bool) {
+    function _isIn(IERC20 _token, IERC20[] storage _tokens) internal view returns (bool) {
         uint256 _numberOfTokens = _tokens.length;
 
         for(uint256 i; i < _numberOfTokens;) {

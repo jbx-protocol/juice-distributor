@@ -7,7 +7,7 @@ import "forge-std/Test.sol";
 import "../src/JBDistributor.sol";
 
 contract JBDistributorTest is Test {
-    event Claimed(address indexed caller, JBDistributor.ClaimableToken[] basket);
+    event Claimed(address indexed caller, address[] tokens, uint256[] amounts);
     event SnapshotTaken(uint256 timestamp);
 
     ForTest_JBDistributor public distributor;
@@ -19,7 +19,7 @@ contract JBDistributorTest is Test {
     address public tokenTwo;
     address public tokenThree;
 
-    JBDistributor.ClaimableToken[] previousBasket;
+    IERC20[] previousBasketTokens;
 
     function setUp() public {
         staker = makeAddr("staker");
@@ -38,9 +38,9 @@ contract JBDistributorTest is Test {
         vm.etch(tokenThree, hex"69");
 
         // Mock a previous snapshot
-        previousBasket.push(JBDistributor.ClaimableToken(tokenOne, 100));
-        previousBasket.push(JBDistributor.ClaimableToken(tokenTwo, 200));
-        distributor.overrideClaimableBasket(previousBasket);
+        previousBasketTokens.push(tokenOne);
+        previousBasketTokens.push(tokenTwo);
+        distributor.overrideClaimableBasket(previousBasketTokens, [100, 200]);
         distributor.overrideSnapshotTimestamp(block.timestamp);
     }
 
@@ -49,7 +49,7 @@ contract JBDistributorTest is Test {
      */
     function test_JBDistributor_deposit_shouldDepositAndUpdateBalance(uint256 _depositAmount) public {
         // Get the previously claimable basket amounts
-        JBDistributor.ClaimableToken[] memory _claimableBefore = distributor.currentClaimable(staker);
+        (IERC20[] memory _tokenClaimableBefore, uint256[] memory _amountsClaimableBefore) = distributor.currentClaimable(staker);
 
         // get the amount already staked
         uint256 stakedBalanceBefore = distributor.stakedBalanceOf(staker);
@@ -59,7 +59,7 @@ contract JBDistributorTest is Test {
         distributor.deposit(_depositAmount);
 
         // Check: claimable amounts should not have changed
-        assertEq(_claimableBefore, distributor.currentClaimable(staker));
+        assertEq( (_tokenClaimableBefore, _amountsClaimableBefore), distributor.currentClaimable(staker));
 
         // Check: staked balance should have increased by the deposit
         assertEq(stakedBalanceBefore + _depositAmount, distributor.stakedBalanceOf(staker));
@@ -104,10 +104,10 @@ contract JBDistributorTest is Test {
         assertEq(_currentTimestamp, distributor.lastSnapshotAt());
 
         // Check: claimable basket should have been updated
-        JBDistributor.ClaimableToken[] memory newBasket = new JBDistributor.ClaimableToken[](3);
-        newBasket[0] = JBDistributor.ClaimableToken(tokenOne, 1000);
-        newBasket[1] = JBDistributor.ClaimableToken(tokenTwo, 2000);
-        newBasket[2] = JBDistributor.ClaimableToken(tokenThree, 3000);
+        IERC20[] memory newBasket = new IERC20[](3);
+        newBasket[0] = JBDistributor.ClaimableToken(tokenOne);
+        newBasket[1] = JBDistributor.ClaimableToken(tokenTwo);
+        newBasket[2] = JBDistributor.ClaimableToken(tokenThree);
 
         for(uint256 i; i < newBasket.length; i++) {
             (address _token, uint256 _amount) = distributor.currentClaimableBasket(i);
@@ -208,7 +208,7 @@ contract JBDistributorTest is Test {
     }
 
     // internal helper
-    function assertEq(JBDistributor.ClaimableToken[] memory _a, JBDistributor.ClaimableToken[] memory _b) internal {
+    function assertEq(IERC20[] memory _a, IERC20[] memory _b) internal {
         assertEq(_a.length, _b.length);
         for (uint256 i = 0; i < _a.length; i++) {
             assertEq(_a[i].token, _b[i].token);
@@ -218,11 +218,13 @@ contract JBDistributorTest is Test {
 }
 
 contract ForTest_JBDistributor is JBDistributor {
-    function overrideClaimableBasket(JBDistributor.ClaimableToken[] memory _newBasket) public {
+    function overrideClaimableBasket(IERC20[] memory _newBasket, uint256[] memory _amounts) public {
         delete currentClaimableBasket;
 
-        for(uint256 i = 0; i < currentClaimableBasket.length; i++)
-            currentClaimableBasket.push(_newBasket[i]);
+        for(uint256 i = 0; i < currentClaimableBasket.length; i++) {
+            projectTokens.push(_newBasket[i]);
+            currentAmountClaimable[_newBasket[i]] = _amounts[i];
+        }
     }
 
     function overrideSnapshotTimestamp(uint256 _newTimestamp) public {

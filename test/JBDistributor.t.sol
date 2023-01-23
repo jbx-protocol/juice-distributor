@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import "@juicebox/structs/JBSplit.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/Test.sol";
 import "../src/JBDistributor.sol";
@@ -151,14 +152,14 @@ contract JBDistributorTest is Test {
         vm.mockCall(tokenThree, abi.encodeWithSelector(IERC20.balanceOf.selector, address(distributor)), abi.encode(3000));
 
         // Check: correct event?
-        emit SnapshotTaken(_currentTimestamp);
+        emit SnapshotTaken(block.timestamp + distributor.periodicity() + 1);
         vm.expectEmit(true, true, true, true);
 
         // -- take snapshot --
         distributor.allocate(_data);
 
         // Check: snapshot timestamp should have been updated
-        assertEq(_currentTimestamp, distributor.lastSnapshotAt());
+        assertEq(block.timestamp + distributor.periodicity() + 1, distributor.lastSnapshotAt());
 
         // Check: claimable basket should have been updated
         JBDistributor.ClaimableToken[] memory newBasket = new JBDistributor.ClaimableToken[](2);

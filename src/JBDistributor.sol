@@ -16,6 +16,7 @@ contract JBDistributor is IJBSplitAllocator {
 
     error JBDistributor_emptyClaim();
     error JBDistributor_snapshotTooEarly();
+    error JBDistributor_canNotDistributeStakedToken();
 
     // The minimum delay between two snapshots
     uint256 immutable public periodicity;
@@ -92,6 +93,9 @@ contract JBDistributor is IJBSplitAllocator {
     // For now, only ERC20 -> to support project token without erc20, claim() should have a way to know if claimed/unclaimed
     // (additional mapping? Additional call to tokenStore.balanceOf? -> need gas check)
     function allocate(JBSplitAllocationData calldata _data) external payable override {
+        // Make sure the token is not the staking token, otherwise that suddenly becomes distributable
+        if (IERC20(_data.token) == stakedToken) revert JBDistributor_canNotDistributeStakedToken();
+
         // Check if the token is already tracked, if not, add it
         if(!_isIn(IERC20(_data.token), projectTokens)) projectTokens.push(IERC20(_data.token));
         

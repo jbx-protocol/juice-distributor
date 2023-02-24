@@ -32,6 +32,9 @@ contract JBDistributor is IJBSplitAllocator {
     // The project id of the staked token, controlling this contract
     uint256 immutable public projectId;
 
+    // The governance NFT
+    JBGovernanceNFT immutable public governanceNFT;
+
     // The timestamp of the last snapshot
     uint256 public lastSnapshotAt;
 
@@ -60,7 +63,7 @@ contract JBDistributor is IJBSplitAllocator {
         
         for(uint256 i; i < _numberOfTokens;) {
             token[i] = projectTokens[i];
-            claimableAmount[i] = currentAmountClaimable[token[i]] * stakedBalanceOf[_staker] / _totalStaked * ;
+            claimableAmount[i] = currentAmountClaimable[token[i]] * stakedBalanceOf[_staker] / _totalStaked;
             unchecked {
                 ++ i;
             }
@@ -91,10 +94,15 @@ contract JBDistributor is IJBSplitAllocator {
         stakedToken = _stakedToken;
         periodicity = _periodicity;
         projectId = _projectId;
+
+        governanceNFT = new JBGovernanceNFT(_stakedToken);
     }
 
     // deposit _depositAmount of stakedToken
     function stake(uint256 _amount) external {
+        stakedToken.transferFrom(msg.sender, address(this), _amount);
+        
+        governanceNFT.mint(_amount, msg.sender);
     }
 
     function unstake(uint256 _amount) external {
@@ -107,7 +115,7 @@ contract JBDistributor is IJBSplitAllocator {
         // + reentrancy vector
 
         // Only claim once per epoch
-        claimed[_staker][lastSnapshotAt] = true;
+        claimed[msg.sender][lastSnapshotAt] = true;
 
         // todo
     }

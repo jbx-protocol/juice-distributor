@@ -7,6 +7,8 @@ import { JBSplitAllocationData }      from "@juicebox/structs/JBSplitAllocationD
 
 import { IERC20 }                     from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import { JBGovernanceNFT } from 'lib/juice-governance-nft/src/JBGovernanceNFT.sol';
+
 /**
  * @title   JBDistributor
  * @notice 

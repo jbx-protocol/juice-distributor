@@ -60,9 +60,11 @@ contract JBDistributor is IJBSplitAllocator {
         uint256 _totalStaked = stakedToken.balanceOf(address(this));
         
         uint256 _numberOfTokens = projectTokens.length;
-        
+
+        // prevent multiple SLOADS in the loop
+        token = projectTokens;
+
         for(uint256 i; i < _numberOfTokens;) {
-            token[i] = projectTokens[i];
             claimableAmount[i] = currentAmountClaimable[token[i]] * stakedBalanceOf[_staker] / _totalStaked;
             unchecked {
                 ++ i;
@@ -74,8 +76,10 @@ contract JBDistributor is IJBSplitAllocator {
     function getBasket() external view returns (IERC20[] memory token, uint256[] memory claimableAmount) {
         uint256 _numberOfTokens = projectTokens.length;
 
+        // prevent multiple SLOADS in the loop
+        token = projectTokens;
+
         for(uint256 i; i < _numberOfTokens;) {
-            token[i] = projectTokens[i];
             claimableAmount[i] = currentAmountClaimable[token[i]];
             unchecked {
                 ++ i;
@@ -145,9 +149,12 @@ contract JBDistributor is IJBSplitAllocator {
         uint256 _numberOfTokens = projectTokens.length;
         uint256 _newNumberOfTokens = _numberOfTokens;
 
+        // prevent multiple SLOADS in the loop
+        IERC20[] memory _token = projectTokens;
+
         for(uint256 i; i < _newNumberOfTokens;) {
-            IERC20 _currentToken = projectTokens[i];
-            uint256 _currentTokenBalance = projectTokens[i].balanceOf(address(this));
+            IERC20 _currentToken = _token[i];
+            uint256 _currentTokenBalance = _currentToken.balanceOf(address(this));
 
             // remove the token with an empty balance
             if(_currentTokenBalance == 0) {

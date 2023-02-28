@@ -104,12 +104,20 @@ contract JBDistributor is IJBSplitAllocator {
 
     // deposit _depositAmount of stakedToken
     function stake(uint256 _amount) external {
+        // If delay has passed, take a new snapshot
+        if(lastSnapshotAt + periodicity < block.timestamp) {
+            takeSnapshot();
+        }
         stakedToken.transferFrom(msg.sender, address(this), _amount);
         
         governanceNFT.mint(_amount, msg.sender);
     }
 
     function unstake(uint256 _amount) external {
+        // If delay has passed, take a new snapshot
+        if(lastSnapshotAt + periodicity < block.timestamp) {
+            takeSnapshot();
+        }
     }
 
     function claim() external {
@@ -122,6 +130,10 @@ contract JBDistributor is IJBSplitAllocator {
         claimed[msg.sender][lastSnapshotAt] = true;
 
         // todo
+        // If delay has passed, take a new snapshot
+        if(lastSnapshotAt + periodicity < block.timestamp) {
+            takeSnapshot();
+        }
     }
 
     // For now, only ERC20 -> to support project token without erc20, claim() should have a way to know if claimed/unclaimed
